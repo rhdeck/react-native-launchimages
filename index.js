@@ -49,8 +49,9 @@ function getInfo(argv, config, args) {
         message:
           "What is the path or URL of the image you would like to base your launch images (splash screens) on? \n(should be on the big side)",
         validate: answer => {
+          answer = answer.trim();
           try {
-            const u = new u.URL(answer);
+            const u = new url.URL(answer);
             return true;
           } catch (err) {
             const rp = fs.realpathSync(answer);
