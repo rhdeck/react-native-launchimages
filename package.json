@@ -1,0 +1,34 @@
+{
+  "name": "react-native-launchimages",
+  "version": "1.0.0",
+  "description": "Creates/manages native splash screens for RN apps",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rhdeck/react-native-launchimages.git"
+  },
+  "author": "Ray Deck",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/rhdeck/react-native-launchimages/issues"
+  },
+  "homepage": "https://github.com/rhdeck/react-native-launchimages#readme",
+  "dependencies": {
+    "child-process-promise": "^2.2.1",
+    "inquirer": "^4.0.1",
+    "plist": "^2.1.0",
+    "request": "^2.83.0",
+    "temp": "^0.8.3",
+    "xcode": "rhdeck/cordova-node-xcode"
+  },
+  "bin": "linkimages.js",
+  "rnpm": {
+    "plugin": "index.js",
+    "commands": {
+      "postlink": "./node_modules/.bin/react-native-launchimages"
+    }
+  }
+}
