@@ -17,8 +17,12 @@ Any subsequent run on react-native link updates the library of launch images bas
 
 # Limitations
 
-This is currently for IOS-based RN apps only
+This is currently for IOS-based RN apps only. This is also the "wrong" way to do a launch image. The "right" way is with a launch screen XIB featuring askeleton state. That said, a lot of apps we all know use the "splash" approach, and it can be a simpler (and non-code) approach.
 
 # Dependencies
 
 This requires imagemagick to be installed. If its missing, don't worry: the plugin will recommend how you might install it.
+
+# Next Steps
+
+Looking into automating a LaunchScreen.xib and the activity-based splash for Android is definitely the more solid way of doing this.
