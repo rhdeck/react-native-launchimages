@@ -5,7 +5,7 @@ Never have ugly launch/splash screens again!
 # Usage
 
 ```
-yarn add react-native-launchimages
+yarn add react-native-launchimages --dev
 react-native setlaunchimage
 ```
 
