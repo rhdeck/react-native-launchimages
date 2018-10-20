@@ -117,7 +117,9 @@
       "orientation": "portrait",
       "idiom": "iphone",
       "extent": "full-screen",
-      "scale": "2x"
+      "scale": "2x",
+      "width": 640,
+      "height": 960
     },
     {
       "orientation": "portrait",
@@ -126,7 +128,7 @@
       "subtype": "retina4",
       "scale": "2x",
       "width": 640,
-      "height": 960
+      "height": 1136
     },
     {
       "orientation": "portrait",
