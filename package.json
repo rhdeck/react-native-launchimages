@@ -22,7 +22,7 @@
     "plist": "^2.1.0",
     "request": "^2.83.0",
     "temp": "^0.8.3",
-    "xcode": "rhdeck/cordova-node-xcode"
+    "@raydeck/xcode": "^2.2.0"
   },
   "bin": "linkimages.js",
   "rnpm": {
