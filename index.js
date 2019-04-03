@@ -111,7 +111,7 @@ function getInfo(argv, config, args) {
 }
 module.exports = {
   name: "setlaunchimage",
-  description: "Identify the launch image URL or path for building",
+  description: "Identify the launch image URL or path",
   func: (argv, config, args) => {
     if (getLaunchImageInfo().pathorurl) {
       inquirer
