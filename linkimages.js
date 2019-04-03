@@ -11,6 +11,16 @@ const xcode = require("@raydeck/xcode");
 const plist = require("plist");
 const getLaunchImageInfo = require("./lib/getLaunchImageInfo");
 const cornerColorPromise = require("./lib/cornerColorPromise");
+const mustache = require("mustache");
+const splashlines = `<activity
+android:name=".SplashActivity"
+android:theme="@style/SplashTheme"
+android:label="@string/app_name">
+<intent-filter>
+    <action android:name="android.intent.action.MAIN" />
+    <category android:name="android.intent.category.LAUNCHER" />
+</intent-filter>
+</activity>`.split("\n");
 const resizers = {
   fill: (source, target, width, height) => {
     if (!height) height = width;
@@ -204,8 +214,10 @@ if (!contents) {
   console.log("Could not find Contents.json file, aborting");
   process.exit();
 }
-loadImage().then(
-  imagepath => {
+(async () => {
+  try {
+    const imagepath = await loadImage();
+    //#region IOS
     contents.images = contents.images.map(obj => {
       const width = obj.width;
       const height = obj.height;
@@ -244,9 +256,161 @@ loadImage().then(
     fs.writeFileSync(contentsPath, JSON.stringify(contents, null, 2));
     console.log("Successfully created iOS launch images");
     fixProject();
-  },
-  errormessage => {
-    console.log("Could not load the starting image", errormessage);
-    pricess.exit();
+    //#endregion IOS
+    //#region Android
+    //Let's get the image into place
+    console.log("Starting Android launch image");
+    const mainpath = path.join(process.cwd(), "android", "app", "src", "main");
+    const respath = path.join(mainpath, "res");
+    const drawablepath = path.join(respath, "drawable");
+    if (!fs.existsSync(drawablepath)) fs.mkdirSync(drawablepath);
+    fs.copyFileSync(
+      imagepath,
+      path.join(drawablepath, "launch_screen" + path.extname(imagepath))
+    );
+    const layoutpath = path.join(respath, "layout");
+    if (!fs.existsSync(layoutpath)) fs.mkdirSync(layoutpath);
+    if (!fs.existsSync(path.join(layoutpath, "launch_screen.xml"))) {
+      fs.copyFileSync(
+        path.join(__dirname, "templates", "launch_screen.xml"),
+        path.join(layoutpath, "launch_screen.xml")
+      );
+    }
+    //Let's check for
+    const splashxmlpath = path.join(respath, "values", "splash.xml");
+    if (fs.existsSync(splashxmlpath)) fs.unlinkSync(splashxmlpath);
+    const splashbase = fs.readFileSync(
+      path.join(__dirname, "templates", "splash.xml"),
+      { encoding: "UTF8" }
+    );
+    let bg = getBGColor();
+    if (bg === null) bg = "#000";
+    const splashxml = mustache.render(splashbase, { color: bg });
+    fs.writeFileSync(splashxmlpath, splashxml);
+    fs.copyFileSync(
+      path.join(__dirname, "templates", "fullscreen.background_splash.xml"),
+      path.join(drawablepath, "background_splash.xml")
+    );
+    const jsbase = glob.sync(
+      path.join(mainpath, "java", "**", "MainActivity.java")
+    )[0];
+    const AppjsPath = glob.sync(path.join(process.cwd(), "App.js"))[0];
+    const splashactivitypath = path.join(
+      path.dirname(jsbase),
+      "SplashActivity.java"
+    );
+    if (!fs.existsSync(splashactivitypath)) {
+      //Open the file to extract the package name
+      const mainActivity = fs.readFileSync(jsbase, { encoding: "UTF8" });
+      const mainActivityLines = mainActivity.split("\n");
+      const packageLines = mainActivityLines.filter(l =>
+        l.trim().startsWith("package")
+      );
+      const firstPackageLine = packageLines[0];
+      const splash = fs.readFileSync(
+        path.join(__dirname, "templates", "SplashActivity.java"),
+        { encoding: "UTF8" }
+      );
+      const newSplash = [firstPackageLine, splash].join("\n");
+      fs.writeFileSync(splashactivitypath, newSplash);
+    }
+    //Check out the manifest - this is where things get dicey
+    const manifestPath = path.join(mainpath, "AndroidManifest.xml");
+    const manifest = fs.readFileSync(manifestPath, { encoding: "UTF8" });
+    //let's check for the splashactivity
+    if (!manifest.includes("SplashActivity")) {
+      //Let's get to work
+      //Split into lines
+      let lines = manifest.split("\n");
+      //Shimmy down to the intent filter for the main activity
+      const { newLines } = lines.reduce(
+        (o, l) => {
+          if (o.isApplication) {
+            //Ask about this line
+            o.newLines.push(l);
+            if (l.trim().endsWith(">")) {
+              o.isApplication = false;
+              o.newLines = [...o.newLines, ...splashlines];
+            }
+          } else {
+            if (l.includes("<application")) o.isApplication = true;
+            if (l.includes("<intent-filter")) o.isIntent = true;
+
+            if (!o.isIntent) {
+              o.newLines.push(l);
+            } else {
+              if (l.includes("</intent-filter>")) o.isIntent = false;
+            }
+          }
+          return o;
+        },
+        { newLines: [], isApplication: false }
+      );
+      const newManifest = newLines.join("\n");
+      fs.writeFileSync(manifestPath, newManifest);
+    }
+    //Now check out mainactivity for auto-loading the splash
+    const mainActivity = fs.readFileSync(jsbase, { encoding: "UTF8" });
+    if (!mainActivity.includes("SplashScreen")) {
+      if (!mainActivity.includes("onCreate")) {
+        // Jam 'er in there
+        let lines = mainActivity.split("\n");
+        //find last import line
+        const lastImportRev = [...lines]
+          .reverse()
+          .findIndex(l => l.trim().startsWith("import"));
+        const lastImport = lines.length - lastImportRev;
+        lines.splice(
+          lastImport,
+          0,
+          "import android.os.Bundle;",
+          "import org.devio.rn.splashscreen.SplashScreen;"
+        );
+        //Look for the mainactivity class
+        const MainActivitySTART = lines.findIndex(l =>
+          l.includes("public class MainActivity")
+        );
+        lines.splice(
+          MainActivitySTART + 1,
+          0,
+          `
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        SplashScreen.show(this);  // here
+        super.onCreate(savedInstanceState);
+    }`
+        );
+        fs.writeFileSync(jsbase, lines.join("\n"));
+      } else {
+        console.warn(
+          "I could not modify the MainActivity because it looks like an onCreate override is already present."
+        );
+      }
+    }
+    console.log("Starting appjs check");
+    const Appjs = fs.readFileSync(AppjsPath, { encoding: "UTF8" });
+    //let's check it for reference to splashscreen
+    if (!Appjs.includes("splashscreen")) {
+      //Add splashscreen reference
+      //find import line
+      const Appjslines = Appjs.split("\n");
+      //find last line
+      const pos =
+        Appjslines.length -
+        [...Appjslines]
+          .reverse()
+          .findIndex(l => l.trim().startsWith("import "));
+      Appjslines.splice(
+        pos,
+        0,
+        `import SplashScreen from "react-native-splash-screen";`,
+        `SplashScreen.hide();`
+      );
+      const out = Appjslines.join("\n");
+      fs.writeFileSync(AppjsPath, out);
+    }
+    //#endregion Android
+  } catch (e) {
+    console.log("Could not load the starting image", e);
   }
-);
+})();
